@@ -1,0 +1,76 @@
+[a]=Initialization;
+
+load trustnetwork.mat;
+edit trustnetwork.mat;
+for i=1:111781
+    if(trustnetwork(i,1)<=1000 && trustnetwork(i,2)<=1000)
+        b(trustnetwork(i,1),trustnetwork(i,2))=1;
+    end
+end
+
+
+save('Initialization-a.mat','a');
+save('Initialization-b.mat','b');
+n=999;
+m=3500;
+
+%load average.mat;
+%load netrate.mat;
+
+x=6;
+
+%load TRUST.mat;
+%load Reputation.mat;
+%load Similarity.mat;
+%load Weight.mat;
+%load Initialpred.mat;
+%load SAI.mat;
+%load VAI.mat;
+%load Reliability.mat;
+
+[avg,r]=Average(a,n,m);
+[TRUST]=Trust(a,avg,n,m,x); 
+[rep]=Reputation(a,b,TRUST,n,m,x);
+[sim]=Similarity(a,r,n,m,x);    
+[k]=Weight(TRUST,sim,rep,n); 
+
+[pred]=Initialpred(a,avg,k,n,m,x);
+[sbar,vbar,sai,vai]=Medians(a,avg,k,pred,n,m,x);
+sai
+vai
+sbar
+vbar
+[rel]=Reliability(a,avg,k,pred,n,m,x,sai,vai,sbar,vbar);
+rel
+size=0;
+co=0;
+for j=1:m
+    if(vai(j)>0)
+        size=size+1;
+        co=co+vai(j);
+    end
+end
+vbar=co/size;
+size=0;
+co=0;
+for j=1:m
+    if(sai(j)>0)
+        size=size+1;
+        co=co+vai(j);
+    end
+end
+sbar=co/size;
+
+
+you=0;
+
+c=0;
+
+for i=1:m
+    if(a(x,i)>0 && rel(i)>0.4)
+        you=you+abs(a(x,i)-pred(i));
+        c=c+1;
+    end
+end
+MAE=you/c;
+MAE

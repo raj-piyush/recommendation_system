@@ -1,0 +1,269 @@
+%[a]=Initialization();
+a=[0 2 1 5 0;
+   0 2 3 4 0;
+   5 0 0 1 3;
+   4 5 2 1 0;
+   0 1 5 2 4];
+%load trustnetwork.mat;
+%for i=1:355754
+   % if(trustnetwork(i,2)<=2000 && trustnetwork(i,1)<=2000)
+  %      b(trustnetwork(i,1),trustnetwork(i,2))=1;
+ %   end
+%end
+b=[0 1 0 0 1;
+    0 0 1 0 0;
+    0 1 0 1 1;
+    1 0 1 0 0;
+    1 0 1 0 1];
+ x=3; %%%%%%%%%%%%% 
+%n=2000; %%%%%%%%%%%%% Number of Users
+%m=5000; %%%%%%%%%%%%% Number of Items
+n=5;
+m=5;
+%{ calculation of d(a,u) %}
+d=sparse(b);
+
+da=zeros(1,n);
+%ts=3557;
+ts=11;
+damax=log(n)/(log(ts/n)) ;
+
+    for u=1:n
+    
+ [dist1,path1,pred1]=graphshortestpath(d,x,u,'directed',true);
+ [dist2,path2,pred2]=graphshortestpath(d,u,x,'directed',true);
+        if(dist2<dist1)
+     dist=dist2;
+         else
+     dist=dist1;
+        end
+da(1,u)=dist;
+        if(da(1,u)==Inf)
+    da(1,u)=0;
+        end
+    end
+%{calculation of t(a,u)
+t=zeros(1,n);
+    for i=1:n
+         if(da(1,i)~=0)
+    t(1,i)=((damax-da(1,i)+1)/damax);
+        else
+        t(1,i)=0;
+         end
+    end
+    
+avg=zeros(1,n);
+    for i=1:n
+    sum=0;
+    count=0;
+        for j=1:m
+            sum=sum+a(i,j);
+             if(a(i,j)>0)
+           count=count+1;
+             end
+         end
+        avg(i)=sum/count;
+        sum=0;
+        count=0;
+    end
+    
+    r=zeros(1,n);
+    for i=1:n
+         for j=1:m
+            if(a(i,j)>0)  %%%%%% Taking persons into account who actually matters 
+    r(i,j)=a(i,j)-avg(i);
+            end
+         end
+    end
+    
+    %{ calculation of sim(a,u) %}
+
+ s1=0;
+q=0;
+ q2=0;
+ sim=zeros(1,n);
+    for i=1:n
+         for j=1:m
+            if(x~=i && a(x,j)>0 && a(i,j)>0)  %%%%%% the set of items which are rated by both of the users a and u
+            s1=s1+r(x,j)*r(i,j);
+            end
+         end
+        for j=1:m
+            if(x~=i && a(x,j)>0 && a(i,j)>0 )
+                q=q+r(i,j)*r(i,j);
+            end
+         end
+    q=sqrt(q);
+     for j=1:m
+        if(x~=i && a(x,j)>0 && a(i,j)>0)
+                q2=q2+r(x,j)*r(x,j);
+        end
+    end
+    q2=sqrt(q2);
+        if(q~=0 && q2 ~=0)
+    sim(i)=s1/(q*q2);
+        end
+    s1=0;
+    q=0;
+    q2=0;
+    end
+  
+    %{ calculation of weight %}
+w=zeros(1,n);
+k=zeros(1,n);
+for i=1:n
+        if(t(1,i)==0 && sim(i)~=0)
+        w(i)=sim(i);
+        
+         elseif(sim(i)==0 && t(1,i)~=0)
+            w(i)=t(1,i);
+            
+         elseif((t(1,i)+sim(i))~=0)
+          w(i)=((2*sim(i)*t(1,i))/(sim(i)+t(1,i)));
+ 
+         else
+             w(i)=0;
+        end
+        if(w(i)>0)
+        k(i)=w(i);
+         else
+        k(i)=0;
+        end
+    
+end
+     %%%% TOP 3 RECOMMENDATIONS
+TEST=zeros(1,m);
+
+for given=1:m
+    TEST(given)=a(x,given);
+end
+
+   [SV,SI]=sort(TEST(:),'descend'); %%% sorting in descending order on the basis of indices
+   maxindex=SI(1:3);
+        
+   %%%%%%%%%% Finding SAI
+   sai=zeros(1,3);
+   pred=zeros(1,5);
+   
+for j=1:3
+   for i=1:n
+        if( a(i,maxindex(j))>0 && i~=x )
+           sai(j)=sai(j)+k(i);
+         end
+   end 
+   
+    p=0;
+    q=0;
+    tio=0;
+        for i=1:n
+            if(a(i,maxindex(j))>0 && i~=x)
+            tio=(a(i,maxindex(j))-avg(i));
+           p=p+k(i)*tio;
+           q=q+k(i);
+            end
+         end 
+    pred(maxindex(j))=avg(x) + (p/q) ; %%%%% Initial Rate Prediction
+    
+ 
+%%%%%%% Finding VAI
+er=0;
+for i=1:n
+    if(a(i,maxindex(j))>0 && i~=x)
+        er=er+(k(i)*(a(i,maxindex(j))-avg(i)-pred(maxindex(j))+avg(x))*(a(i,maxindex(j))-avg(i)-pred(maxindex(j))+avg(x)));
+        
+    end
+    
+end
+q=0;
+
+for i=1:n
+    if(a(i,maxindex(j))>0 && i~=x)
+        q=q+k(i);
+    end
+end
+vai(j)=er/q;
+
+    for i=1:n
+         if(k(i)~=0)
+    qert(j,i)=k(i)*(a(i,maxindex(j))-avg(i));
+         else
+        qert(j,i)=-1;
+         end
+    end
+end
+sair=sort(sai);
+sbar=sair(2);
+vair=sort(vai);
+vbar=vair(2);
+
+   if(vbar==0)
+       vbar=1;
+   end
+   
+ FinalREL=zeros(1,5);
+ Finalpred=zeros(1,5);
+   
+for kop=1:3
+     knew=k;
+    l=100000;
+    ASD=-1;
+    for j=1:n
+    
+        p=0;
+    q=0;
+    tio=0;
+       for i=1:n
+            if(a(i,maxindex(kop))>0 && i~=x)
+            tio=(a(i,maxindex(kop))-avg(i));
+           p=p+knew(i)*tio;
+           q=q+knew(i);
+            end
+        end 
+         pred(kop)=avg(x) + (p/q) ; %%%%% Initial Rate Prediction
+     
+         [REL(kop)]=check(a,knew,avg,maxindex(kop),x,n,m,pred(maxindex(kop)),sbar,vbar);
+         if(ASD<REL(kop))
+     	  ASD=REL(kop);
+          fpred=pred(kop);
+         end
+    
+        for i=1:n
+             if(qert(kop,i)<l && qert(kop,i)>=0)
+                l=qert(kop,i);
+                index = i;
+             end
+        end
+        if(index~=0)
+         qert(kop,index)= -1;
+         knew(index)=0;
+        end
+    end
+    REL(kop)=ASD;
+    if(fpred<=5)
+    pred(kop)=fpred;
+    else
+        pred(kop)=5;
+    end
+    
+    ITEM = maxindex(kop);
+    if(REL(kop)>=0.5)
+    FinalREL(ITEM)=REL(kop);
+    Finalpred(ITEM)=pred(kop);
+    else
+        Finalpred(ITEM)=avg(x);
+         FinalREL(ITEM)=0.5;
+    end
+end
+Finalpred
+you=0;
+for i=1:m
+    if(Finalpred(i)>0)
+        you=you+abs(a(x,i)-Finalpred(i));
+    end
+end
+MAE=you/3;
+
+
+
+
+
